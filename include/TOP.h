@@ -11,7 +11,9 @@
 #include <systemc.h>
 #include "single_sram.h"
 
-#define ioMode PIN
+//#define ioMode PIN
+
+#define ioMode TLM2LT
 
 class SRAM_DUT:public sc_module{
 public:

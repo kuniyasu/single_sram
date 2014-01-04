@@ -258,14 +258,13 @@ public:
 			if( base_port_type::nwe.read() == false ){
 				base_type::sram_write(base_port_type::addr.read(),base_port_type::wdata.read());
 
-				cout << "SRAM PIN Mode Write accress ADDR:" <<addr << " WDATA:" << wdata << endl;
+				std::cout << "SRAM PIN Mode Write accress ADDR:" <<addr << " WDATA:" << wdata << std::endl;
 			}else{
 				rdata =  base_type::sram_read(addr);
 				base_port_type::rdata.write( rdata );
 
-				cout << "SRAM PIN Mode Read  accress ADDR:" << addr << " RDATA:" << rdata << endl;
+				std::cout << "SRAM PIN Mode Read  accress ADDR:" << addr << " RDATA:" << rdata << std::endl;
 			}
-
 		}
 	}
 
@@ -299,6 +298,16 @@ public:
 	}
 };
 
+template<unsigned int ADWIDTH, unsigned int DTWIDTH, unsigned int SIZE>
+class sram_base_port<ADWIDTH,DTWIDTH,SIZE,TLM2LT>:public sc_port<sram_if<ADWIDTH,DTWIDTH,SIZE> >{
+public:
+	typedef sc_port<sram_if<ADWIDTH,DTWIDTH,SIZE> > base_type;
+	typedef sram_if<ADWIDTH,DTWIDTH,SIZE> if_type;
+	typedef typename if_type::addr_type addr_type;
+	typedef typename if_type::data_type data_type;
+
+	sram_base_port(const char* name=sc_gen_unique_name("sram_base_port")):base_type(name){}
+};
 
 template<unsigned int ADWIDTH, unsigned int DTWIDTH, unsigned int SIZE>
 class sram_base_export<ADWIDTH,DTWIDTH,SIZE,TLM2LT>:public sc_export<sram_if<ADWIDTH,DTWIDTH,SIZE> >{
@@ -314,18 +323,47 @@ public:
 };
 
 template<unsigned int ADWIDTH, unsigned int DTWIDTH, unsigned int SIZE>
+class sram_port<ADWIDTH,DTWIDTH,SIZE,TLM2LT>:public sc_port<sram_if<ADWIDTH,DTWIDTH,SIZE> >{
+public:
+	typedef sc_port<sram_if<ADWIDTH,DTWIDTH,SIZE> > base_type;
+	typedef sram_if<ADWIDTH,DTWIDTH,SIZE> if_type;
+	typedef typename if_type::addr_type addr_type;
+	typedef typename if_type::data_type data_type;
+
+	sc_in<bool> clk;
+	sc_in<bool> nrst;
+
+	sram_port(const char* name=sc_gen_unique_name("sram_port")):base_type(name){}
+
+	void set_trace(sc_trace_file* tf){
+		sc_trace(tf, clk,  clk.name());
+		sc_trace(tf, nrst, nrst.name());
+	}
+
+	virtual void reset(){}
+
+	virtual void sram_write(const addr_type& addr, const data_type& wdata){
+		(*this)->sram_write(addr,wdata);
+	}
+
+	virtual data_type sram_read(const addr_type& addr){
+		return (*this)->sram_read(addr);
+	}
+};
+
+template<unsigned int ADWIDTH, unsigned int DTWIDTH, unsigned int SIZE>
 class sram_wrapper<ADWIDTH,DTWIDTH,SIZE,TLM2LT>:public sram_base_core<ADWIDTH,DTWIDTH,SIZE>{
 public:
 	typedef sram_if<ADWIDTH,DTWIDTH,SIZE> if_type;
 	typedef typename if_type::addr_type addr_type;
 	typedef typename if_type::data_type data_type;
-	typedef sram_base_export<ADWIDTH,DTWIDTH,SIZE,TLM2LT> base_type;
+	typedef sram_base_core<ADWIDTH,DTWIDTH,SIZE> base_type;
 
 	sc_in<bool> clk;
 
 	sram_base_export<ADWIDTH,DTWIDTH,SIZE,TLM2LT> ex_port;
 
-	sram_wrapper(const char* name=sc_gen_unique_name("sram_wrapper")):clk(PIN_NAME(name,"clk")), base_type(name){
+	sram_wrapper(const char* name=sc_gen_unique_name("sram_wrapper")):base_type(name),clk(PIN_NAME(name,"clk")){
 		ex_port(*this);
 	}
 };
