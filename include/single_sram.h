@@ -29,6 +29,58 @@ template<unsigned int ADWIDTH, unsigned int DTWIDTH, unsigned int SIZE, class MO
 template<unsigned int ADWIDTH, unsigned int DTWIDTH, unsigned int SIZE, class MODE>class sram_port;
 //template<unsigned int ADWIDTH, unsigned int DTWIDTH, unsigned int SIZE, class MODE>class sram_export;
 
+class sram_ckg;
+
+class sram_ckg:public sc_module{
+public:
+	sc_in<bool>  ck;
+	sc_in<bool>  cken;
+	sc_in<bool>  tmode;
+	sc_out<bool> cko;
+
+	sc_signal<bool> lat;
+
+	SC_HAS_PROCESS(sram_ckg);
+
+	sram_ckg(const sc_module_name name=sc_gen_unique_name("sram_ckg")):sc_module(name),
+	ck(PIN_NAME(name,"ck")),
+	cken(PIN_NAME(name,"cken")),
+	tmode(PIN_NAME(name,"tmode")),
+	cko(PIN_NAME(name,"cko"))
+	{
+		SC_METHOD(lat_method);
+		sensitive << cken << ck;
+
+		SC_METHOD(cko_method);
+		sensitive << tmode << ck << lat;
+		dont_initialize();
+
+		end_module();
+	}
+
+	void set_trace(sc_trace_file* tf){
+		sc_trace(tf, ck,    ck.name());
+		sc_trace(tf, cken,  cken.name());
+		sc_trace(tf, tmode, tmode.name());
+		sc_trace(tf, cko,   cko.name());
+	}
+
+	void cko_method(){
+		if( tmode.read() == false ){
+			cko = (lat.read() & ck.read());
+		}else{
+			cko = ck.read();
+		}
+	}
+
+	void lat_method(){
+		if( ck.read() == false){
+			lat = cken.read();
+		}
+	}
+
+};
+
 template<unsigned int ADWIDTH, unsigned int DTWIDTH, unsigned int SIZE>
 class sram_if:public sc_interface{
 public:
@@ -85,6 +137,14 @@ public:
 	wdata(PIN_NAME(name,"wdata")),
 	rdata(PIN_NAME(name,"rdata")){}
 
+	void set_trace(sc_trace_file* tf){
+		sc_trace(tf, ncs,   ncs.name());
+		sc_trace(tf, nwe,   nwe.name());
+		sc_trace(tf, addr,  addr.name());
+		sc_trace(tf, wdata, wdata.name());
+		sc_trace(tf, rdata, rdata.name());
+	}
+
 	template<class P> void bind(P& p){
 		ncs(p.ncs);
 		nwe(p.nwe);
@@ -119,6 +179,14 @@ public:
 	wdata(PIN_NAME(name,"wdata")),
 	rdata(PIN_NAME(name,"rdata")){}
 
+	void set_trace(sc_trace_file* tf){
+		sc_trace(tf, ncs,   ncs.name());
+		sc_trace(tf, nwe,   nwe.name());
+		sc_trace(tf, addr,  addr.name());
+		sc_trace(tf, wdata, wdata.name());
+		sc_trace(tf, rdata, rdata.name());
+	}
+
 	template<class P> void bind(P& p){
 		ncs(p.ncs);
 		nwe(p.nwe);
@@ -136,7 +204,6 @@ template<unsigned int ADWIDTH, unsigned int DTWIDTH, unsigned int SIZE, class MO
 class sram_port:public sc_module, public sram_base_port<ADWIDTH,DTWIDTH,SIZE,MODE>, public sram_if<ADWIDTH,DTWIDTH,SIZE>{
 public:
 	typedef sram_base_port<ADWIDTH,DTWIDTH,SIZE,MODE> base_type;
-
 	typedef sram_if<ADWIDTH,DTWIDTH,SIZE> if_type;
 	typedef typename if_type::addr_type addr_type;
 	typedef typename if_type::data_type data_type;
@@ -160,7 +227,6 @@ public:
 		sc_trace(tf, base_type::addr,  base_type::addr.name());
 		sc_trace(tf, base_type::wdata, base_type::wdata.name());
 		sc_trace(tf, base_type::rdata, base_type::rdata.name());
-
 	}
 
 	virtual void reset(){
@@ -174,6 +240,8 @@ public:
 		base_type::wdata.write(wdata);
 		wait();
 		base_type::ncs.write(true);
+
+		cout << "Fnction " << __FUNCTION__ << " is called. ADD:[" << addr << "] = " << wdata << endl;
 	}
 
 	virtual data_type sram_read(const addr_type& addr){
@@ -182,7 +250,12 @@ public:
 		base_type::nwe.write(true);
 		wait();
 		base_type::ncs.write(true);
-		return base_type::rdata.read();
+		wait();
+		data_type rdata = base_type::rdata.read();
+
+		cout << "Fnction " << __FUNCTION__ << " is called. ADD:[" << addr << "] = " << rdata << endl;
+
+		return rdata;
 	}
 
 	template<class P> void bind(P& p){
@@ -214,10 +287,16 @@ public:
 
 	virtual void sram_write(const addr_type& addr, const data_type& wdata) {
 		memcell[addr] = wdata;
+
+		cout << "Fnction " << __FUNCTION__ << " is called. ADD:[" << addr << "] = " << wdata << endl;
 	}
 
 	virtual data_type sram_read(const addr_type& addr) {
-		return memcell[addr];
+		data_type rdata =  memcell[addr];
+
+		cout << "Fnction " << __FUNCTION__ << " is called. ADD:[" << addr << "] = " << rdata << endl;
+
+		return rdata;
 	}
 
 	data_type& operator[](const addr_type& addr){
@@ -257,13 +336,9 @@ public:
 
 			if( base_port_type::nwe.read() == false ){
 				base_type::sram_write(base_port_type::addr.read(),base_port_type::wdata.read());
-
-				std::cout << "SRAM PIN Mode Write accress ADDR:" <<addr << " WDATA:" << wdata << std::endl;
 			}else{
 				rdata =  base_type::sram_read(addr);
 				base_port_type::rdata.write( rdata );
-
-				std::cout << "SRAM PIN Mode Read  accress ADDR:" << addr << " RDATA:" << rdata << std::endl;
 			}
 		}
 	}
@@ -344,9 +419,13 @@ public:
 
 	virtual void sram_write(const addr_type& addr, const data_type& wdata){
 		(*this)->sram_write(addr,wdata);
+
+		cout << "Fnction " << __FUNCTION__ << " is called." << endl;
 	}
 
 	virtual data_type sram_read(const addr_type& addr){
+		cout << "Fnction " << __FUNCTION__ << " is called." << endl;
+
 		return (*this)->sram_read(addr);
 	}
 };

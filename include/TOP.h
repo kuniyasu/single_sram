@@ -11,8 +11,8 @@
 #include <systemc.h>
 #include "single_sram.h"
 
-//#define ioMode PIN
 
+//#define ioMode PIN
 #define ioMode TLM2LT
 
 class SRAM_DUT:public sc_module{
@@ -34,6 +34,9 @@ public:
 	}
 
 	void set_trace(sc_trace_file* tf){
+		sc_trace(tf, clk,  clk.name());
+		sc_trace(tf, nrst, nrst.name());
+
 		port.set_trace(tf);
 	}
 
@@ -45,8 +48,15 @@ public:
 		sram32<ioMode>::inf::data_type wdt;
 		sram32<ioMode>::inf::data_type rdt;
 
-		port.sram_write(addr,wdt);
-		rdt = port.sram_read(addr);
+		for(int i=0; i<1000; i++){
+			addr = i;
+			wdt = i;
+
+			port.sram_write(addr,wdt);
+			rdt = port.sram_read(addr);
+
+			if( rdt != wdt ){ cout << "ERR" << endl;}
+		}
 
 		wait();
 		wait();
@@ -93,7 +103,7 @@ public:
 		wait(100,SC_NS);
 
 		nrst = true;
-		wait(10,SC_MS);
+		wait(10000,SC_MS);
 
 		sc_stop();
 	}
