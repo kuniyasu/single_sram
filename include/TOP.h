@@ -2,7 +2,7 @@
  * TOP.h
  *
  *  Created on: 2014/01/04
- *      Author: Kuniyasu
+ *      Author: Kuniyasu Asano
  */
 
 #ifndef TOP_H_
@@ -31,9 +31,20 @@ public:
 		end_module();
 	}
 
+	void set_trace(sc_trace_file* tf){
+		port.set_trace(tf);
+	}
+
 	void main_thread(){
 		port.reset();
 		wait();
+
+		sram32<ioMode>::inf::addr_type addr;
+		sram32<ioMode>::inf::data_type wdt;
+		sram32<ioMode>::inf::data_type rdt;
+
+		port.sram_write(addr,wdt);
+		rdt = port.sram_read(addr);
 
 		wait();
 		wait();
@@ -66,6 +77,13 @@ public:
 
 		SC_THREAD(timeout_thread);
 		end_module();
+	}
+
+
+	void set_trace(sc_trace_file* tf){
+		sram_dut.set_trace(tf);
+		sc_trace(tf, clk,  clk.name());
+		sc_trace(tf, nrst, nrst.name());
 	}
 
 	void timeout_thread(){

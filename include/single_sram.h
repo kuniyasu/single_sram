@@ -2,7 +2,7 @@
  * single_sram.h
  *
  *  Created on: 2014/01/04
- *      Author: Kuniyasu
+ *      Author: Kuniyasu Asano
  */
 
 #ifndef SINGLE_SRAM_H_
@@ -151,24 +151,37 @@ public:
 		end_module();
 	}
 
+	void set_trace(sc_trace_file* tf){
+		sc_trace(tf, clk,  clk.name());
+		sc_trace(tf, nrst, nrst.name());
+
+		sc_trace(tf, base_type::ncs,   base_type::ncs.name());
+		sc_trace(tf, base_type::nwe,   base_type::nwe.name());
+		sc_trace(tf, base_type::addr,  base_type::addr.name());
+		sc_trace(tf, base_type::wdata, base_type::wdata.name());
+		sc_trace(tf, base_type::rdata, base_type::rdata.name());
+
+	}
+
 	virtual void reset(){
 		base_type::ncs.write(true);
 	}
 
 	virtual void sram_write(const addr_type& addr, const data_type& wdata){
-		base_type::ncs.write(true);
+		base_type::ncs.write(false);
 		base_type::addr.write(addr);
 		base_type::nwe.write(false);
+		base_type::wdata.write(wdata);
 		wait();
-		base_type::ncs.write(false);
+		base_type::ncs.write(true);
 	}
 
 	virtual data_type sram_read(const addr_type& addr){
-		base_type::ncs.write(true);
-		base_type::addr.write(addr);
-		base_type::nwe.write(false);
-		wait();
 		base_type::ncs.write(false);
+		base_type::addr.write(addr);
+		base_type::nwe.write(true);
+		wait();
+		base_type::ncs.write(true);
 		return base_type::rdata.read();
 	}
 
@@ -212,7 +225,8 @@ public:
 	}
 };
 
-template<unsigned int ADWIDTH, unsigned int DTWIDTH, unsigned int SIZE>class sram_core:public sc_module, public sram_base_core<ADWIDTH,DTWIDTH,SIZE>, public sram_base_export<ADWIDTH,DTWIDTH,SIZE,PIN>{
+template<unsigned int ADWIDTH, unsigned int DTWIDTH, unsigned int SIZE>
+class sram_core:public sc_module, public sram_base_core<ADWIDTH,DTWIDTH,SIZE>, public sram_base_export<ADWIDTH,DTWIDTH,SIZE,PIN>{
 public:
 	typedef sram_if<ADWIDTH,DTWIDTH,SIZE> if_type;
 	typedef sram_base_core<ADWIDTH,DTWIDTH,SIZE> base_type;
@@ -234,13 +248,24 @@ public:
 
 	void main_thread(){
 		while( true ){
-			do{ wait(); }while( base_port_type::ncs.read() == false);
+
+			do{ wait(); }while( base_port_type::ncs.read() == true );
+
+			addr_type addr  = base_port_type::addr.read();
+			data_type wdata = base_port_type::wdata.read();
+			data_type rdata = data_type();
 
 			if( base_port_type::nwe.read() == false ){
 				base_type::sram_write(base_port_type::addr.read(),base_port_type::wdata.read());
+
+				cout << "SRAM PIN Mode Write accress ADDR:" <<addr << " WDATA:" << wdata << endl;
 			}else{
-				base_port_type::rdata.write( base_type::sram_read(base_port_type::addr.read()) );
+				rdata =  base_type::sram_read(addr);
+				base_port_type::rdata.write( rdata );
+
+				cout << "SRAM PIN Mode Read  accress ADDR:" << addr << " RDATA:" << rdata << endl;
 			}
+
 		}
 	}
 
@@ -309,10 +334,10 @@ public:
 // TEST wrapper
 template<class MODE>class sram32{
 public:
+	typedef sram_if<32U,32U,1024> inf;
 	typedef sram_base_port<32U,32U,1024,MODE> base_port;
 	typedef sram_port<32U,32U,1024,MODE> port;
 	typedef sram_base_export<32U,32U,1024,MODE> base_export;
-
 	typedef sram_wrapper<32U,32U,1024,MODE> wrapper;
 };
 
