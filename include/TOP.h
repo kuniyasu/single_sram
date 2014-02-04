@@ -12,8 +12,8 @@
 #include "single_sram.h"
 
 
-//#define ioMode PIN
-#define ioMode TLM2LT
+#define ioMode PIN
+//#define ioMode TLM2LT
 
 class SRAM_DUT:public sc_module{
 public:
@@ -73,6 +73,8 @@ public:
 	sc_clock clk;
 	sc_signal<bool> nrst;
 
+	sc_signal<bool> tmode;
+
 	SRAM_DUT sram_dut;
 	sram32<ioMode>::wrapper memory;
 
@@ -86,6 +88,7 @@ public:
 		sram_dut.nrst(nrst);
 		sram_dut.port(memory.ex_port);
 		memory.clk(clk);
+		memory.tmode(tmode);
 
 		SC_THREAD(timeout_thread);
 		end_module();
